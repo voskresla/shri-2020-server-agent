@@ -60,7 +60,7 @@ class CiServer {
 						})
 						.catch(e => log.error('CiServer: runBuildOnAgent()'))
 				} else {
-					log.log(`Nothing to process.${build ? ' Have build#' + build.id + '.' : ' No builds.'}${agent ? ` ${this.agents.length} free agents` : ' No free agents'}`)
+					log.log(`${build ? '' : 'Nothing to process.'}${build ? ' Have build:' + build.id + '.' : ' No builds.'}${agent ? ` ${this.agents.length} free agents` : ' No free agents'}`)
 				}
 			},
 			interval
@@ -118,7 +118,7 @@ class CiServer {
 		}
 		this.saveBuildResultToStore(buildResult)
 			.then(() => {
-				log.success('  -> Save build to store.\n')
+				log.success('  -> Save build result to store.\n')
 			})
 			.catch(e => log.error('CiServer: processBuildResult()', e))
 	}

@@ -29,8 +29,6 @@ const addAgent = (agents, agentInfo) => {
 	return true
 }
 
-
-
 module.exports = {
 	agentStatus,
 	getFirstAppropriateBuild,

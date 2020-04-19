@@ -3,8 +3,6 @@ var router = express.Router();
 
 const CiServer = require('../model/server')
 
-
-/* GET users listing. */
 router.post('/', function (req, res, next) {
 	// id сборки, статус, лог (stdout и stderr процесса).
 	CiServer.processBuildResult(req.body)
