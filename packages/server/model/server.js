@@ -84,10 +84,21 @@ class CiServer {
 		})
 	}
 
+	/**
+	 * handler for '/notify-agent-build 
+	 */
 	processBuildResult(agent, build, result) {
 		// mark agent FREE
 
 		// mark 
+	}
+
+	/**
+	 * handler for '/notify-agent 
+	 */
+	registerAgent(host, port) {
+		// add agent to this.agents
+
 	}
 
 	saveBuildResultToStore() {
