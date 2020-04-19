@@ -1,23 +1,32 @@
 const axios = require('axios')
 const https = require('https');
 
+const serverRoutes = {
+	notifyAgent: '/notify-agent',
+	notifyAgentBuild: '/notify-agent-build',
+}
+
 const defaultHTTPClient = axios.create({
 	baseURL: `${process.env.SERVERHOST}:${process.env.SERVERPORT}`,
 });
 
-class AgentApi {
+class ServerApi {
 	constructor(api) {
 		this.api = api || defaultHTTPClient
 	}
 
-	runBuild(config, payload) {
-		const { host, port } = config
-		const url = `${host}:${port}`
+	notifyServer(host, port, body) {
+		const url = `http://${host}:${port}${serverRoutes.notifyAgent}`
 
-		// TODO: change to real implementation
-		return Promise.resolve()
-		// return this.api.post(url, payload)
+		return this.api.post(url, body)
+	}
+
+	notifyServerBuild(host, port, buildResult) {
+		const url = `http://${host}:${port}${serverRoutes.notifyAgentBuild}`
+
+		// server.routes: /notify-agent-build
+		return this.api.post(url, buildResult)
 	}
 }
 
-module.exports = AgentApi
+module.exports = ServerApi

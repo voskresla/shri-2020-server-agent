@@ -1,6 +1,13 @@
+const log = require('../utils/chalkLogger')
 const yndxapi = require('../api/yndxApi')
 const agentapi = require('../api/agentApi')
-const { agentStatus, getFirstAppropriateBuild, getFirstFreeAgent, markAgentBusy, popBuild } = require('../utils/serverUtils')
+const {
+	getFirstAppropriateBuild,
+	getFirstFreeAgent,
+	markAgentBusy,
+	markAgentFree,
+	popBuild,
+	addAgent } = require('../utils/serverUtils')
 
 const YndxApi = new yndxapi()
 const AgentApi = new agentapi()
@@ -9,11 +16,7 @@ class CiServer {
 
 	constructor() {
 		this.builds = []
-		this.agents = [
-			{ id: 'http://localhost:5001', host: 'http://localhost', port: '5001', status: agentStatus.FREE },
-			{ id: 'http://localhost:5002', host: 'http://localhost', port: '5002', status: agentStatus.FREE },
-			{ id: 'http://localhost:5003', host: 'http://localhost', port: '5003', status: agentStatus.FREE },
-		]
+		this.agents = []
 	}
 
 	init() {
@@ -22,52 +25,67 @@ class CiServer {
 	}
 
 	getBuilds() {
+		const interval = 10000
+
+		log.success(`Check new builds every ${interval}ms.`)
+
 		const checkBuildsInterval = setInterval(
 			() => {
-				console.log('Check new builds.')
 				YndxApi.getBuilds()
 					.then(({ data: builds }) => {
 						this.builds = builds.data
 					})
-					.catch(e => console.error('ERROR: CiCerver: getBuilds()', e))
+					.catch(e => log.error('YndxApi: getBuilds() -> 500'))
 			},
-			10000
+			interval
 		)
 	}
 
 	processBuildList() {
+		const interval = 5000
+
 		const processInterval = setInterval(
 			() => {
-				console.log('Start process build...')
 				const build = getFirstAppropriateBuild(this.builds)
 				const agent = getFirstFreeAgent(this.agents)
 
 				if (build && agent) {
-					console.log(`Try run build#${build.id} on agent#${agent.id}...`)
+					log.success(`\nTry run build:${build.id} on agent:${agent.id}`)
 					this.runBuildOnAgent(agent, build)
-						.then(() => this.setBuildStart(build))
 						.then(() => {
-							console.log(`Success.`)
+							this.setBuildStart(build)
 						})
-						.catch(e => console.error('ERROR: runBuildOnAgent', e))
+						.then(() => {
+							log.success(`  -> Succesfuly run build on Agent.\n`)
+						})
+						.catch(e => log.error('CiServer: runBuildOnAgent()'))
 				} else {
-					console.log(`Nothing to process. ${build ? 'build#' + build.id + '.' : 'No builds. '} ${agent ? '' : 'No free agents'}`)
+					log.log(`Nothing to process.${build ? ' Have build#' + build.id + '.' : ' No builds.'}${agent ? ` ${this.agents.length} free agents` : ' No free agents'}`)
 				}
 			},
-			5000
+			interval
 		)
 	}
 
 	runBuildOnAgent(agentInfo, buildInfo) {
 		return new Promise((resolve, reject) => {
-			const { id } = agentInfo
+			const { id: agentId } = agentInfo
+			const { id: buildId } = buildInfo
+			const payload = buildInfo
 
-			AgentApi.runBuild(agentInfo, buildInfo)
+			AgentApi.runBuild(agentInfo, payload)
 				.then(() => {
-					markAgentBusy(this.agents, id)
-					resolve(id)
+					try {
+						markAgentBusy(this.agents, agentId, buildId)
+					} catch (e) {
+						log.error('Utils: markAgentBusy()')
+					}
+					resolve()
 				})
-				.catch(e => reject(e))
+				.catch(e => {
+					log.error('CiServer: AgentApi.runBuild()')
+					reject()
+				})
 		})
 	}
 
@@ -80,29 +98,59 @@ class CiServer {
 					this.builds = popBuild(this.builds, id)
 					resolve()
 				})
-				.catch(e => reject(e))
+				.catch(e => reject('FIREFIRE'))
 		})
 	}
 
 	/**
 	 * handler for '/notify-agent-build 
+	 * buildResult: id сборки, статус, лог (stdout и stderr процесса).
 	 */
-	processBuildResult(agent, build, result) {
-		// mark agent FREE
+	processBuildResult(buildResult) {
+		const { id: buildId } = buildResult
 
-		// mark 
+		log.success(`\nRecieve result for build:${buildId}`)
+
+		try {
+			markAgentFree(this.agents, buildId)
+		} catch (e) {
+			console.log(e)
+		}
+		this.saveBuildResultToStore(buildResult)
+			.then(() => {
+				log.success('  -> Save build to store.\n')
+			})
+			.catch(e => log.error('CiServer: processBuildResult()', e))
 	}
 
 	/**
 	 * handler for '/notify-agent 
 	 */
 	registerAgent(host, port) {
-		// add agent to this.agents
+		const id = `${host}:${port}`
+		const agentInfo = { id, host, port }
 
+		addAgent(this.agents, agentInfo)
+			? log.success(`\nRegister new agent: ${host}:${port}\n`)
+			: log.error(`\nAgent ${host}:${port} try register twice.\n`)
 	}
 
-	saveBuildResultToStore() {
+	saveBuildResultToStore(buildInfo) {
+		return new Promise((resolve, reject) => {
 
+			const FinishBuildInput = {
+				buildId: buildInfo.id,
+				duration: 0,
+				success: buildInfo.status === 'Success' ? true : false,
+				buildLog: buildInfo.stdout
+			}
+
+			YndxApi.finishBuild(FinishBuildInput)
+				.then(() => {
+					resolve()
+				})
+				.catch(e => reject('ERROR: setBuildFinish()'))
+		})
 	}
 }
 

@@ -8,11 +8,7 @@ const app = require('../app');
 const debug = require('debug')('server:server');
 const http = require('http');
 
-/**
- * Run & Init CI Server.
- */
-const CiServer = require('../model/server')
-CiServer.init()
+
 
 /**
  * Get port from environment and store in Express.
@@ -94,4 +90,11 @@ function onListening() {
 		? 'pipe ' + addr
 		: 'port ' + addr.port;
 	debug('Listening on ' + bind);
+	// console.log('Listening SERVER on ' + bind)
 }
+
+/**
+ * Run & Init CI Server.
+ */
+const CiServer = require('../model/server')
+CiServer.init()

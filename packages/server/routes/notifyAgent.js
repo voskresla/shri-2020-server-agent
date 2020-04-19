@@ -5,9 +5,10 @@ const CiServer = require('../model/server')
 
 
 
-/* GET home page. */
-router.get('/', function (req, res, next) {
-	CiServer.processBuildList()
+
+router.post('/', function (req, res, next) {
+	const { host, port } = req.body
+	CiServer.registerAgent(host, port)
 	res.send('ddd');
 });
 

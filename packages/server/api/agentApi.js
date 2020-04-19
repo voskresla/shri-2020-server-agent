@@ -8,13 +8,16 @@ class AgentApi {
 		this.api = api || defaultHTTPClient
 	}
 
+	/**
+	 * handler for POST to Agent '/build 
+	 */
 	runBuild(config, payload) {
 		const { host, port } = config
-		const url = `${host}:${port}`
+		const url = `http://${host}:${port}/build`
 
 		// TODO: change to real implementation
-		return Promise.resolve()
-		// return this.api.post(url, payload)
+		// return Promise.resolve()
+		return this.api.post(url, payload)
 	}
 }
 

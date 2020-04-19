@@ -22,12 +22,12 @@ class YndxApi {
 
 	startBuild(buildId) {
 		const dateTime = new Date().toISOString()
-		const payload = { buildId, dateTime }
-		return this.api.post('/build/start/', payload)
+		const StartBuildInput = { buildId, dateTime }
+		return this.api.post('/build/start/', StartBuildInput)
 	}
 
-	finishBuild() {
-
+	finishBuild(FinishBuildInput) {
+		return this.api.post('build/finish', FinishBuildInput)
 	}
 }
 
