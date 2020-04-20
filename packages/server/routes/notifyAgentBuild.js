@@ -1,12 +1,23 @@
-var express = require('express');
-var router = express.Router();
+const express = require('express');
+const router = express.Router();
 
 const CiServer = require('../model/server')
 
+/**
+* req.body: buildResult: {
+* 		id:
+* 		status:
+* 		stdout:
+* 		stderr:
+* }.
+*/
 router.post('/', function (req, res, next) {
-	// id сборки, статус, лог (stdout и stderr процесса).
-	CiServer.processBuildResult(req.body)
-	res.send('respond with a resource');
+	try {
+		CiServer.processBuildResult(req.body)
+	} catch (e) {
+		log.test(`ERROR recieve build`, e)
+	}
+	res.send({ status: 'OK' });
 });
 
 module.exports = router;

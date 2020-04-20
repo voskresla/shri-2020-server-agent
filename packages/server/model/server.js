@@ -8,6 +8,7 @@ const {
 	markAgentFree,
 	popBuild,
 	addAgent } = require('../utils/serverUtils')
+const { buildStatusEnum } = require('../utils/utils')
 
 const YndxApi = new yndxapi()
 const AgentApi = new agentapi()
@@ -104,23 +105,29 @@ class CiServer {
 
 	/**
 	 * handler for '/notify-agent-build 
-	 * buildResult: id сборки, статус, лог (stdout и stderr процесса).
+	 *
+	 * buildResult: {
+	 * 		id:
+	 * 		status:
+	 * 		stdout:
+	 * 		stderr:
+	 * }.
 	 */
 	processBuildResult(buildResult) {
 		const { id: buildId } = buildResult
-
 		log.success(`\nRecieve result for build:${buildId}`)
 
-		try {
-			markAgentFree(this.agents, buildId)
-		} catch (e) {
-			console.log(e)
-		}
-		this.saveBuildResultToStore(buildResult)
+		markAgentFree(this.agents, buildId)
+
+		this.saveBuildResultToYandexApi(buildResult)
 			.then(() => {
 				log.success('  -> Save build result to store.\n')
 			})
-			.catch(e => log.error('CiServer: processBuildResult()', e))
+			.catch(e => {
+				log.error('', e)
+				this.saveBuildResultToRottenDB(buildResult)
+				log.error(' -> save build result to rottenFinishedResults.json')
+			})
 	}
 
 	/**
@@ -135,22 +142,28 @@ class CiServer {
 			: log.error(`\nAgent ${host}:${port} try register twice.\n`)
 	}
 
-	saveBuildResultToStore(buildInfo) {
+	saveBuildResultToYandexApi(buildResult) {
 		return new Promise((resolve, reject) => {
-
 			const FinishBuildInput = {
-				buildId: buildInfo.id,
+				buildId: buildResult.id,
 				duration: 0,
-				success: buildInfo.status === 'Success' ? true : false,
-				buildLog: buildInfo.stdout
+				success: buildStatusEnum[buildResult.status],
+				buildLog: buildResult.stdout || buildResult.stderr
 			}
 
+			// TODO: если 500 - положить результат в rottenFinishResults.json: {id,duration,status,log}
 			YndxApi.finishBuild(FinishBuildInput)
 				.then(() => {
 					resolve()
 				})
-				.catch(e => reject('ERROR: setBuildFinish()'))
+				.catch(e => {
+					reject(`ERROR:FailedToSaveResult -> setBuildFinish() -> YndxApi.finishBiuld -> ${e.response.status}`)
+				})
 		})
+	}
+
+	saveBuildResultToRottenDB(buildResult) {
+
 	}
 }
 

@@ -15,6 +15,8 @@ const markAgentBusy = (agents, agentId, buildId) => {
 
 const markAgentFree = (agents, buildId) => {
 	const agent = agents.find(e => e.buildId === buildId)
+	if (!agent) { console.log('ERROR in markAgentFree'); return }
+
 	agent.status = agentStatus.FREE
 	agent.buildId = ''
 }

@@ -1,17 +1,10 @@
-const log = require('../utils/chalkLogger')
-const serverApi = require('../api/serverApi')
 const os = require("os");
+const log = require('../utils/chalkLogger')
+const { agentStatusEnum, buildStatusEnum } = require("../utils/utils");
+// const gitApi = require('../utils/gitUtils')
 
-const agentStatusEnum = {
-	BUSY: 'busy',
-	FREE: 'free'
-}
 
-const buildStatusEnum = {
-	SUCCESS: 'Success',
-	FAIL: 'Fail'
-}
-
+const serverApi = require('../api/serverApi')
 const ServerApi = new serverApi()
 
 class Agent {
@@ -42,13 +35,22 @@ class Agent {
 		log.success(`\nTry register AGENT:${selfUrl} on SERVER:${serverUrl}`)
 
 		ServerApi.notifyServer(this.remoteHost, this.remotePort, body)
-			.then(() => log.success('  -> Successfuly register.'))
+			.then(() => log.success('  -> successfuly register.'))
 			.catch(e => log.error('\nAgent: registerOnServer(). Server don\'t response.'))
 	}
 
 	// TODO: implement real build process
-	processBuild(build) {
+	processBuild(build, settings = undefined) {
 		log.success(`\nStart processing for build:${build.id}`)
+
+		gitApi.runBuildJob(build, settings)
+			.then((buildResult) => {
+				log.test('runBuildJob:result -> buildResult', e)
+			})
+			.then(() => {
+
+			})
+			.catch(e => console.log('hm'))
 
 		// id сборки, статус, лог (stdout и stderr процесса).
 		const buildResult = {
@@ -65,7 +67,7 @@ class Agent {
 	sendBuildResultToServer(buildResult) {
 		log.success(' -> Try send result to SERVER.')
 		ServerApi.notifyServerBuild(this.remoteHost, this.remotePort, buildResult)
-			.then(() => log.success(' --> Successfully send build result to server.'))
+			.then(() => log.success(' -> successfully send build result to server.'))
 			.catch(e => log.error('Agent: sendBuildResultToServer(). Server don\'t response.', e))
 	}
 
