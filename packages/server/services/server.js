@@ -8,7 +8,6 @@ const {
 	markAgentFree,
 	popBuild,
 	addAgent } = require('../utils/serverUtils')
-const { buildStatusEnum } = require('../utils/utils')
 
 const YndxApi = new yndxapi()
 const AgentApi = new agentapi()
@@ -20,17 +19,39 @@ class CiServer {
 		this.agents = []
 		// TODO: implement real settings
 		this.configuration = {
-			id: "b42c7bb2-09b2-4671-9b9f-2d82395ee4c0",
-			repoName: "voskresla/voskresla.github.io",
-			buildCommand: "npm run build && npm run test",
-			mainBranch: "master",
+			// id: "b42c7bb2-09b2-4671-9b9f-2d82395ee4c0",
+			// repoName: "voskresla/voskresla.github.io",
+			// buildCommand: "node npm run build",
+			// mainBranch: "master",
+			// period: 20
+		}
+	}
+
+	async init() {
+		this.getBuilds()
+		this.processBuildList()
+		const response = await YndxApi.getConfiguration()
+		this.configuration = {
+			id: response.data.data.id,
+			repoName: response.data.data.repoName,
+			buildCommand: response.data.data.buildCommand,
+			mainBranch: response.data.data.mainBranch,
 			period: 20
 		}
 	}
 
-	init() {
-		this.getBuilds()
-		this.processBuildList()
+	/**
+	 * handler for '/notify-agent 
+	 */
+	registerAgent(host, port) {
+		const id = `${host}:${port}`
+		const agentInfo = { id, host, port }
+
+		if (addAgent(this.agents, agentInfo)) {
+			log.success(`\nRegister new agent: ${host}:${port}\n`)
+		} else {
+			throw { type: 'BL', message: `Agent ${host}:${port} try register twice.` }
+		}
 	}
 
 	getBuilds() {
@@ -59,15 +80,8 @@ class CiServer {
 				const agent = getFirstFreeAgent(this.agents)
 
 				if (build && agent) {
-					log.success(`\nTry run build:${build.id} on agent:${agent.id}`)
+					log.success(`Try run build:${build.id} on agent:${agent.id}`)
 					this.runBuildOnAgent(agent, build)
-						.then(() => {
-							this.setBuildStart(build)
-						})
-						.then(() => {
-							log.success(`  -> Succesfuly run build on Agent.\n`)
-						})
-						.catch(e => log.error('CiServer: runBuildOnAgent()'))
 				} else {
 					log.log(`${build ? '' : 'Nothing to process.'}${build ? 'Have build:' + build.id + '.' : ' No builds.'}${agent ? ` ${this.agents.length} free agents` : ' No free agents'}`)
 				}
@@ -75,7 +89,6 @@ class CiServer {
 			interval
 		)
 	}
-
 
 	/**
 	 * agentModel {
@@ -96,6 +109,7 @@ class CiServer {
 		const jobBuildModel = {
 			id: build.id,
 			uri: `https://github.com/${this.configuration.repoName}`,
+			commitHash: build.commitHash,
 			buildCommand: this.configuration.buildCommand
 		}
 
@@ -103,6 +117,8 @@ class CiServer {
 			const response = await AgentApi.runBuild(agent, jobBuildModel)
 			markAgentBusy(this.agents, agent.id, jobBuildModel.id)
 			log.success(response)
+
+			this.setBuildStart(build.id)
 		} catch (e) {
 			// error control flow:
 			// - type: 'HTTP' -> ...delete agent -> try send build for another agent -> if no free agents save to quie DB
@@ -125,17 +141,13 @@ class CiServer {
 		}
 	}
 
-	setBuildStart(buildInfo) {
-		return new Promise((resolve, reject) => {
-			const { id } = buildInfo
-
-			YndxApi.startBuild(id)
-				.then(() => {
-					this.builds = popBuild(this.builds, id)
-					resolve()
-				})
-				.catch(e => reject('FIREFIRE'))
-		})
+	async setBuildStart(buildId) {
+		try {
+			const response = await YndxApi.startBuild(buildId)
+			this.builds = popBuild(this.builds, buildId)
+		} catch (e) {
+			log.error(e)
+		}
 	}
 
 	/**
@@ -151,54 +163,46 @@ class CiServer {
 
 		try {
 			markAgentFree(this.agents, buildResult.id)
+			this.saveBuildResultToYandexApi(buildResult)
 		} catch (e) {
-			throw new Error(`Error in mark agent as free`)
-		}
-
-		this.saveBuildResultToYandexApi(buildResult)
-			.then(() => {
-				log.success('  -> Save build result to store.\n')
-			})
-			.catch(e => {
-				// log.error('', e)
-
-				// log.error(' -> save build result to rottenFinishedResults.json')
-				throw new Error(`Error in mark agent as free. \n ${e}`)
-			})
-	}
-
-	/**
-	 * handler for '/notify-agent 
-	 */
-	registerAgent(host, port) {
-		const id = `${host}:${port}`
-		const agentInfo = { id, host, port }
-
-		if (addAgent(this.agents, agentInfo)) {
-			log.success(`\nRegister new agent: ${host}:${port}\n`)
-		} else {
-			throw { type: 'BL', message: `Agent ${host}:${port} try register twice.` }
+			log.error(e)
 		}
 	}
 
-	saveBuildResultToYandexApi(buildResult) {
-		return new Promise((resolve, reject) => {
-			const FinishBuildInput = {
-				buildId: buildResult.id,
-				duration: 0,
-				success: buildStatusEnum[buildResult.status],
-				buildLog: buildResult.stdout || buildResult.stderr
+
+	async saveBuildResultToYandexApi(buildResult) {
+		const FinishBuildInput = {
+			buildId: buildResult.id,
+			duration: 1000,
+			success: buildResult.status,
+			buildLog: '' + buildResult.stdout + buildResult.stderr
+		}
+
+		try {
+			const result = await YndxApi.finishBuild(FinishBuildInput)
+			log.success(result)
+		} catch (e) {
+			// error control flow:
+			// - type: 'HTTP' -> ...retry
+			// - type: 'BL': -> ...log -> выяснять почему от агента пришли данные в плохом формате
+			switch (e.type) {
+				case 'HTTP':
+					log.error(e.message)
+					log.error(`YNDX down. TODO: retry feature implementations `)
+					break;
+				case 'BL':
+					log.test('TODO: mock for feature BL logic implementation')
+					break;
+				default:
+					log.error(e)
+					log.error('Check data from AGENT')
+					// TODO: unhandled error logic implementation
+					break;
 			}
-
-			YndxApi.finishBuild(FinishBuildInput)
-				.then(() => {
-					resolve()
-				})
-				.catch(e => {
-					reject(`ERROR:FailedToSaveResult -> setBuildFinish() -> YndxApi.finishBuild -> ${e.response.status}`)
-				})
-		})
+		}
 	}
+
+
 
 	saveBuildResultToRottenDB(buildResult) {
 		// TODO: add lowdb implementation

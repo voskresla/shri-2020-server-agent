@@ -11,7 +11,11 @@ const notifyAgentBuildController = require('../controllers/notifyAgentBuildContr
 * }
 */
 router.post('/', function (req, res) {
+	// в любом случае отвечаем 200:OK
 	res.status(200).send({ status: 'OK', message: 'Server: build result received' });
+
+	console.log(req.body)
+	// потом разбираемся.
 	notifyAgentBuildController(req.body)
 });
 

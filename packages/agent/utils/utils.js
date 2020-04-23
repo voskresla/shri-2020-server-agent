@@ -7,8 +7,8 @@ const agentStatusEnum = {
 exports.agentStatusEnum = agentStatusEnum;
 
 const buildStatusEnum = {
-	SUCCESS: 'Success',
-	FAIL: 'Fail'
+	SUCCESS: true,
+	FAIL: false
 };
 exports.buildStatusEnum = buildStatusEnum;
 

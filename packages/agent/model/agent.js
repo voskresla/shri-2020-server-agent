@@ -26,6 +26,10 @@ class Agent {
 		this.registerOnServer()
 	}
 
+	// notifyAgentModel = {
+	// 		host: 
+	// 		post: 
+	// }
 	async registerOnServer() {
 		const serverUrl = `http://${this.remoteHost}:${this.remotePort}`
 		const selfUrl = `${this.host}:${this.port}`
@@ -55,6 +59,13 @@ class Agent {
 		}
 	}
 
+	/**
+	 * jobBuildModel {
+	 * 		id: '5ecc8837-0f7a-49be-9879-20e92eefaacc',
+	 * 		uri: '',
+	 * 		buildCommand: '',
+	 * }
+	 */
 	async processBuild(jobBuildModel) {
 		log.success(`Agent: start processing for build: ${jobBuildModel.id}`)
 
@@ -62,21 +73,16 @@ class Agent {
 			this.status = agentStatusEnum.BUSY
 
 			// TODO: gitUtils переделать на error logic throw
-			const buildResultModel = await gitUtils.getBuildResult(jobBuildModel, settings)
+			const result = await gitUtils.getBuildResult(jobBuildModel)
 			log.success(`Agent: build ${jobBuildModel.id} job DONE.`)
 
-			this.sendBuildResultToServer(buildResultModel)
+			this.sendBuildResultToServer(result)
 		} catch (e) {
-			log.error(`Agent: processing for build:${jobBuildModel.id} job FAIL.`)
+			log.error(`Agent: npm processing for build:${jobBuildModel.id} job FAIL.`)
+
 			this.status = agentStatusEnum.FREE
 
-			const buildResultModel = {
-				id: jobBuildModel.id,
-				status: buildStatusEnum.FAIL,
-				stdout: '',
-				stderr: 'Error: internal error on Agent:processBuild()'
-			}
-			this.sendBuildResultToServer(buildResultModel)
+			this.sendBuildResultToServer(e) // e = buildResult -> переделать на error flow
 		}
 	}
 
