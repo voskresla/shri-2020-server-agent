@@ -8,12 +8,14 @@ const getFirstAppropriateBuild = builds => builds.find(e => e.status === 'Waitin
 const getFirstFreeAgent = agents => agents.find(e => e.status === agentStatus.FREE)
 
 const markAgentBusy = (agents, agentId, buildId) => {
+	console.log('markAgentsBusy:', agents)
 	const agent = agents.find(e => e.id === agentId)
 	agent.status = agentStatus.BUSY
 	agent.buildId = buildId
 }
 
 const markAgentFree = (agents, buildId) => {
+	console.log('markAgentsFree:', agents)
 	const agent = agents.find(e => e.buildId === buildId)
 	if (!agent) { console.log('ERROR in markAgentFree'); return }
 

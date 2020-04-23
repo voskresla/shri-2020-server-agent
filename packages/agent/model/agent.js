@@ -1,7 +1,6 @@
-const os = require("os");
 const log = require('../utils/chalkLogger')
 const { agentStatusEnum, buildStatusEnum } = require("../utils/utils");
-// const gitApi = require('../utils/gitUtils')
+const gitUtils = require('../utils/gitUtils')
 
 
 const serverApi = require('../api/serverApi')
@@ -16,59 +15,98 @@ class Agent {
 		this.status = agentStatusEnum.FREE
 	}
 
-	init(port) {
-		log.success(`Initialize Agent on PORT:${port}.`)
+	init(selfHost, selfPort, remoteHost, remotePort) {
+		log.success(`Agent: Initialize Agent on PORT:${selfPort}.`)
 
-		this.port = port
-		this.host = os.networkInterfaces().lo0[0].address
-		this.remoteHost = process.env.SERVERHOST
-		this.remotePort = process.env.SERVERPORT
+		this.port = selfPort
+		this.host = selfHost
+		this.remoteHost = remoteHost
+		this.remotePort = remotePort
 
 		this.registerOnServer()
 	}
 
-	registerOnServer() {
+	async registerOnServer() {
 		const serverUrl = `http://${this.remoteHost}:${this.remotePort}`
 		const selfUrl = `${this.host}:${this.port}`
 		const body = { host: this.host, port: this.port }
 
-		log.success(`\nTry register AGENT:${selfUrl} on SERVER:${serverUrl}`)
+		log.success(`Agent: Try register AGENT:${selfUrl} on SERVER:${serverUrl}`)
 
-		ServerApi.notifyServer(this.remoteHost, this.remotePort, body)
-			.then(() => log.success('  -> successfuly register.'))
-			.catch(e => log.error('\nAgent: registerOnServer(). Server don\'t response.'))
-	}
-
-	// TODO: implement real build process
-	processBuild(build, settings = undefined) {
-		log.success(`\nStart processing for build:${build.id}`)
-
-		gitApi.runBuildJob(build, settings)
-			.then((buildResult) => {
-				log.test('runBuildJob:result -> buildResult', e)
-			})
-			.then(() => {
-
-			})
-			.catch(e => console.log('hm'))
-
-		// id сборки, статус, лог (stdout и stderr процесса).
-		const buildResult = {
-			id: build.id,
-			status: buildStatusEnum.SUCCESS,
-			stdout: 'mock STDOUT string from real build implementation',
-			stderr: 'mock STDERR string from real build implementation'
+		try {
+			const response = await ServerApi.notifyServer(this.remoteHost, this.remotePort, body)
+			log.success(response)
+		} catch (e) {
+			// error control flow:
+			// - type: 'HTTP' -> ...retry register in feature implementation (сейчас process.exit())
+			// - type: 'BL': already registered / etc -> ...process.exit()
+			switch (e.type) {
+				case 'HTTP':
+					log.test('TODO: retry register on server')
+					process.exit()
+					break;
+				case 'BL':
+					process.exit()
+					break;
+				default:
+					process.exit()
+					break;
+			}
 		}
-
-
-		setTimeout(() => this.sendBuildResultToServer(buildResult), 5000)
 	}
 
-	sendBuildResultToServer(buildResult) {
-		log.success(' -> Try send result to SERVER.')
-		ServerApi.notifyServerBuild(this.remoteHost, this.remotePort, buildResult)
-			.then(() => log.success(' -> successfully send build result to server.'))
-			.catch(e => log.error('Agent: sendBuildResultToServer(). Server don\'t response.', e))
+	async processBuild(jobBuildModel) {
+		log.success(`Agent: start processing for build: ${jobBuildModel.id}`)
+
+		try {
+			this.status = agentStatusEnum.BUSY
+
+			// TODO: gitUtils переделать на error logic throw
+			const buildResultModel = await gitUtils.getBuildResult(jobBuildModel, settings)
+			log.success(`Agent: build ${jobBuildModel.id} job DONE.`)
+
+			this.sendBuildResultToServer(buildResultModel)
+		} catch (e) {
+			log.error(`Agent: processing for build:${jobBuildModel.id} job FAIL.`)
+			this.status = agentStatusEnum.FREE
+
+			const buildResultModel = {
+				id: jobBuildModel.id,
+				status: buildStatusEnum.FAIL,
+				stdout: '',
+				stderr: 'Error: internal error on Agent:processBuild()'
+			}
+			this.sendBuildResultToServer(buildResultModel)
+		}
+	}
+
+	async sendBuildResultToServer(buildResultModel) {
+		log.success('Agent: try send result to SERVER.')
+
+		try {
+			const response = await ServerApi.notifyServerBuild(this.remoteHost, this.remotePort, buildResultModel)
+			this.status = agentStatusEnum.FREE
+
+			log.success(response)
+		} catch (e) {
+			// error control flow:
+			// - type: 'HTTP' -> ...retry send result in feature implementation (сейчас set status FREE)
+			// - type: 'BL': already registered / etc -> ...process.exit()
+			switch (e.type) {
+				case 'HTTP':
+					log.test('TODO: retry send result on server')
+					this.status = agentStatusEnum.FREE
+					break;
+				case 'BL':
+					log.test('TODO: mock for feature implementation')
+					this.status = agentStatusEnum.FREE
+					break;
+				default:
+					log.error(e)
+					process.exit()
+					break;
+			}
+		}
 	}
 
 }

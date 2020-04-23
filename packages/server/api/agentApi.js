@@ -4,20 +4,46 @@ const https = require('https');
 const defaultHTTPClient = axios.create();
 
 class AgentApi {
-	constructor(api) {
-		this.api = api || defaultHTTPClient
+	constructor(httpClient) {
+		this.httpClient = httpClient || defaultHTTPClient
 	}
 
 	/**
-	 * handler for POST to Agent '/build 
+	 * agentModel {
+	 * 		id: `${host}:${port}`,
+	 * 		host:
+	 * 		port:
+	 * }
 	 */
-	runBuild(config, payload) {
-		const { host, port } = config
+	/**
+	 * jobBuildModel {
+	 * 		id: '5ecc8837-0f7a-49be-9879-20e92eefaacc',
+	 * 		uri: '',
+	 * 		buildCommand: '',
+	 * }
+	 */
+	async runBuild(agent, jobBuildModel) {
+		const { host, port } = agent
 		const url = `http://${host}:${port}/build`
 
-		// TODO: change to real implementation
-		// return Promise.resolve()
-		return this.api.post(url, payload)
+		// agent.routes: /build
+		try {
+			// 200: {status: 'OK', message: 'Agent: receive job for ${req.body.id}'}
+			const response = await this.httpClient.post(url, jobBuildModel)
+
+			if (response.status === 200 && response.data.status !== 'OK') {
+				throw { type: 'BL', message: response.data.message }
+			}
+			if (response.status === 500) {
+				throw { type: 'HTTP', message: 'Agent: route /build -> 500' }
+			}
+			if (response.status === 200 && response.data.status === 'OK') {
+				return response.data.message
+			}
+		} catch (e) {
+			log.error(e.message)
+			throw e
+		}
 	}
 }
 

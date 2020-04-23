@@ -96,5 +96,5 @@ function onListening() {
 /**
  * Run & Init CI Server.
  */
-const CiServer = require('../model/server')
+const CiServer = require('../services/server')
 CiServer.init()

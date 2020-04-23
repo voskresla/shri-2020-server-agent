@@ -18,6 +18,14 @@ class CiServer {
 	constructor() {
 		this.builds = []
 		this.agents = []
+		// TODO: implement real settings
+		this.configuration = {
+			id: "b42c7bb2-09b2-4671-9b9f-2d82395ee4c0",
+			repoName: "voskresla/voskresla.github.io",
+			buildCommand: "npm run build && npm run test",
+			mainBranch: "master",
+			period: 20
+		}
 	}
 
 	init() {
@@ -61,33 +69,60 @@ class CiServer {
 						})
 						.catch(e => log.error('CiServer: runBuildOnAgent()'))
 				} else {
-					log.log(`${build ? '' : 'Nothing to process.'}${build ? ' Have build:' + build.id + '.' : ' No builds.'}${agent ? ` ${this.agents.length} free agents` : ' No free agents'}`)
+					log.log(`${build ? '' : 'Nothing to process.'}${build ? 'Have build:' + build.id + '.' : ' No builds.'}${agent ? ` ${this.agents.length} free agents` : ' No free agents'}`)
 				}
 			},
 			interval
 		)
 	}
 
-	runBuildOnAgent(agentInfo, buildInfo) {
-		return new Promise((resolve, reject) => {
-			const { id: agentId } = agentInfo
-			const { id: buildId } = buildInfo
-			const payload = buildInfo
 
-			AgentApi.runBuild(agentInfo, payload)
-				.then(() => {
-					try {
-						markAgentBusy(this.agents, agentId, buildId)
-					} catch (e) {
-						log.error('Utils: markAgentBusy()')
-					}
-					resolve()
-				})
-				.catch(e => {
-					log.error('CiServer: AgentApi.runBuild()')
-					reject()
-				})
-		})
+	/**
+	 * agentModel {
+	 * 		id: `${host}:${port}`,
+	 * 		host:
+	 * 		port:
+	 * }
+	 */
+	/**
+	 * jobBuildModel {
+	 * 		id: '5ecc8837-0f7a-49be-9879-20e92eefaacc',
+	 * 		uri: '',
+	 * 		buildCommand: '',
+	 * }
+	 */
+	// TODO: возможно стоить сделать runBuild() и агента выбирать тут.
+	async runBuildOnAgent(agent, build) {
+		const jobBuildModel = {
+			id: build.id,
+			uri: `https://github.com/${this.configuration.repoName}`,
+			buildCommand: this.configuration.buildCommand
+		}
+
+		try {
+			const response = await AgentApi.runBuild(agent, jobBuildModel)
+			markAgentBusy(this.agents, agent.id, jobBuildModel.id)
+			log.success(response)
+		} catch (e) {
+			// error control flow:
+			// - type: 'HTTP' -> ...delete agent -> try send build for another agent -> if no free agents save to quie DB
+			// - type: 'BL': -> ...mock for feature implementation
+			switch (e.type) {
+				case 'HTTP':
+					log.error(e.message)
+					log.error(`Agent ${agent.id} dead. TODO: feature implementations`)
+					// TODO: delete agent
+					// TODO: send build for another agent logic
+					break;
+				case 'BL':
+					log.test('TODO: mock for feature BL logic implementation')
+					break;
+				default:
+					log.error(e)
+					// TODO: unhandled error logic implementation
+					break;
+			}
+		}
 	}
 
 	setBuildStart(buildInfo) {
@@ -104,29 +139,31 @@ class CiServer {
 	}
 
 	/**
-	 * handler for '/notify-agent-build 
-	 *
-	 * buildResult: {
+	 * buildResultModel: {
 	 * 		id:
 	 * 		status:
 	 * 		stdout:
 	 * 		stderr:
-	 * }.
+	 * }
 	 */
 	processBuildResult(buildResult) {
-		const { id: buildId } = buildResult
-		log.success(`\nRecieve result for build:${buildId}`)
+		log.success(`\nRecieve result for build:${buildResult.id}`)
 
-		markAgentFree(this.agents, buildId)
+		try {
+			markAgentFree(this.agents, buildResult.id)
+		} catch (e) {
+			throw new Error(`Error in mark agent as free`)
+		}
 
 		this.saveBuildResultToYandexApi(buildResult)
 			.then(() => {
 				log.success('  -> Save build result to store.\n')
 			})
 			.catch(e => {
-				log.error('', e)
-				this.saveBuildResultToRottenDB(buildResult)
-				log.error(' -> save build result to rottenFinishedResults.json')
+				// log.error('', e)
+
+				// log.error(' -> save build result to rottenFinishedResults.json')
+				throw new Error(`Error in mark agent as free. \n ${e}`)
 			})
 	}
 
@@ -137,9 +174,11 @@ class CiServer {
 		const id = `${host}:${port}`
 		const agentInfo = { id, host, port }
 
-		addAgent(this.agents, agentInfo)
-			? log.success(`\nRegister new agent: ${host}:${port}\n`)
-			: log.error(`\nAgent ${host}:${port} try register twice.\n`)
+		if (addAgent(this.agents, agentInfo)) {
+			log.success(`\nRegister new agent: ${host}:${port}\n`)
+		} else {
+			throw { type: 'BL', message: `Agent ${host}:${port} try register twice.` }
+		}
 	}
 
 	saveBuildResultToYandexApi(buildResult) {
@@ -151,19 +190,18 @@ class CiServer {
 				buildLog: buildResult.stdout || buildResult.stderr
 			}
 
-			// TODO: если 500 - положить результат в rottenFinishResults.json: {id,duration,status,log}
 			YndxApi.finishBuild(FinishBuildInput)
 				.then(() => {
 					resolve()
 				})
 				.catch(e => {
-					reject(`ERROR:FailedToSaveResult -> setBuildFinish() -> YndxApi.finishBiuld -> ${e.response.status}`)
+					reject(`ERROR:FailedToSaveResult -> setBuildFinish() -> YndxApi.finishBuild -> ${e.response.status}`)
 				})
 		})
 	}
 
 	saveBuildResultToRottenDB(buildResult) {
-
+		// TODO: add lowdb implementation
 	}
 }
 

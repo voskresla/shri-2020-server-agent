@@ -1,23 +1,18 @@
 const express = require('express');
 const router = express.Router();
-
-const CiServer = require('../model/server')
+const notifyAgentBuildController = require('../controllers/notifyAgentBuildController').notifyAgentBuildController
 
 /**
-* req.body: buildResult: {
+* req.body:buildResultModel {
 * 		id:
 * 		status:
 * 		stdout:
 * 		stderr:
-* }.
+* }
 */
-router.post('/', function (req, res, next) {
-	try {
-		CiServer.processBuildResult(req.body)
-	} catch (e) {
-		log.test(`ERROR recieve build`, e)
-	}
-	res.send({ status: 'OK' });
+router.post('/', function (req, res) {
+	res.status(200).send({ status: 'OK', message: 'Server: build result received' });
+	notifyAgentBuildController(req.body)
 });
 
 module.exports = router;

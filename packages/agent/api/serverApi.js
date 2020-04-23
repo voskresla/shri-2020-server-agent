@@ -1,5 +1,5 @@
 const axios = require('axios')
-const https = require('https');
+const log = require('../utils/chalkLogger')
 
 const serverRoutes = {
 	notifyAgent: '/notify-agent',
@@ -11,21 +11,56 @@ const defaultHTTPClient = axios.create({
 });
 
 class ServerApi {
-	constructor(api) {
-		this.api = api || defaultHTTPClient
+	constructor(httpClient) {
+		this.httpClient = httpClient || defaultHTTPClient
 	}
 
-	notifyServer(host, port, body) {
+	async notifyServer(host, port, body) {
 		const url = `http://${host}:${port}${serverRoutes.notifyAgent}`
 
-		return this.api.post(url, body)
+		// server.routes: /notify-agent
+		try {
+			// 200: {status: 'OK', message: 'Server: agent successfuly registered.'}
+			// 200: {status: 'ERROR', message: 'Server: agent with this id already registered.'}
+			const response = await this.httpClient.post(url, body)
+
+			if (response.status === 200 && response.data.status !== 'OK') {
+				throw { type: 'BL', message: response.data.message }
+			}
+			if (response.status === 500) {
+				throw { type: 'HTTP', message: 'Server: route /notify-agent -> 500' }
+			}
+			if (response.status === 200 && response.data.status === 'OK') {
+				return response.data.message
+			}
+		} catch (e) {
+			log.error(e.message)
+			throw e
+		}
 	}
 
-	notifyServerBuild(host, port, buildResult) {
+	async notifyServerBuild(host, port, buildResult) {
 		const url = `http://${host}:${port}${serverRoutes.notifyAgentBuild}`
 
 		// server.routes: /notify-agent-build
-		return this.api.post(url, buildResult)
+		try {
+			// 200: {status: 'OK', message: '...'}
+			// 200: {status: 'ERROR', message: '...'} 
+			const response = await this.httpClient.post(url, buildResult)
+
+			if (response.status === 200 && response.data.status !== 'OK') {
+				throw { type: 'BL', message: response.data.message }
+			}
+			if (response.status === 500) {
+				throw { type: 'HTTP', message: 'Server: route /notify-agent-build -> 500' }
+			}
+			if (response.status === 200 && response.data.status === 'OK') {
+				return response.data.message
+			}
+		} catch (e) {
+			log.error(e.message)
+			throw e
+		}
 	}
 }
 

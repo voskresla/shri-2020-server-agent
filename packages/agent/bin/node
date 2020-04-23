@@ -3,7 +3,7 @@
 /**
  * Module dependencies.
  */
-
+const os = require("os");
 var app = require('../app');
 var debug = require('debug')('agent:server');
 var http = require('http');
@@ -36,7 +36,12 @@ server.on('listening', onListening);
  * Run & Init Agent.
  */
 const Agent = require('../model/agent')
-Agent.init(port)
+Agent.init(
+  os.networkInterfaces().lo0[0].address,
+  port,
+  process.env.SERVERHOST,
+  process.env.SERVERPORT
+)
 
 
 /**
