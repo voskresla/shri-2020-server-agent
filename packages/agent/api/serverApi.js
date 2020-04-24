@@ -2,7 +2,6 @@ const axios = require('axios')
 const log = require('../utils/chalkLogger')
 const config = require('../config/agentConfig.json')
 
-
 const serverRoutes = {
 	notifyAgent: '/notify-agent',
 	notifyAgentBuild: '/notify-agent-build',

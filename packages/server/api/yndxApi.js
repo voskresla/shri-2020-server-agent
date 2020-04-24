@@ -23,8 +23,22 @@ class YndxApi {
 		return this.httpClient.get('/build/list/?limit=300')
 	}
 
-	getConfiguration() {
-		return this.httpClient.get('/conf')
+	async getConfiguration() {
+		try {
+			const result = await this.httpClient.get('/conf')
+			if (Object.keys(result.data).length === 0) throw { type: 'BL', message: 'No settings on YNDX. First set configuration. Retry in 10sec' }
+			return result
+		} catch (e) {
+			switch (e.type) {
+				case 'BL':
+					throw e
+					break;
+				default:
+					log.error(`YNDX /conf don\`t response, try again later.`)
+					throw { type: 'HTTP' }
+					break;
+			}
+		}
 	}
 
 	async startBuild(buildId) {

@@ -1,0 +1,19 @@
+{
+  "settings": [
+    {
+      "id": "b42c7bb2-09b2-4671-9b9f-2d82395ee4c0",
+      "repoName": "voskresla/shri-2020-hw-0003",
+      "buildCommand": "npm i && npm run preflight && npm run test:unit",
+      "mainBranch": "master",
+      "period": 20
+    },
+    {
+      "id": "5ac61dcd-803c-4926-8b60-5802806d0f80",
+      "repoName": "voskresla/shri-2020-hw-0003",
+      "buildCommand": "npm i && npm run preflight && npm run test:unit",
+      "mainBranch": "master",
+      "period": 20
+    }
+  ],
+  "rottenBuilds": []
+}

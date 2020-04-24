@@ -8,6 +8,12 @@ const {
 	markAgentFree,
 	popBuild,
 	addAgent } = require('../utils/serverUtils')
+const low = require('lowdb')
+const FileSync = require('lowdb/adapters/FileSync')
+const path = require('path')
+
+const adapter = new FileSync('./db/db.json')
+const db = low(adapter)
 
 const YndxApi = new yndxapi()
 const AgentApi = new agentapi()
@@ -28,11 +34,26 @@ class CiServer {
 	}
 
 	async init() {
-
-		this.getSettings()
-		this.getBuilds()
-		this.processBuildList()
-
+		try {
+			await this.getSettings()
+			await this.getBuilds()
+			await this.processBuildList()
+		} catch (e) {
+			switch (e.type) {
+				case 'BL':
+					log.error(e.message)
+					setTimeout(() => this.init(), 10000)
+					break;
+				case 'HTTP':
+					log.error(e.message)
+					setTimeout(() => this.init(), 10000)
+					break;
+				default:
+					log.error(e)
+					// setTimeout(() => this.init(), 10000)
+					break;
+			}
+		}
 	}
 
 	/**
@@ -59,10 +80,15 @@ class CiServer {
 				mainBranch: response.data.data.mainBranch,
 				period: 20
 			}
-			log.success(`Take configuration.`)
+
+			// TODO: что-то я начал добавлять таймер и опрос и.. ID настроек не меняется если сохранить просто новую команду. 
+			// - значит надо переделать сохранение настроек на DELETE + POST и только потом делать логику тут.
+			!db.get('settings').find({ id: this.configuration.id }).value()
+				? db.get('settings').push(this.configuration).write()
+				: null
+
 		} catch (e) {
-			log.error(`YNDX /conf don\`t response, try again later.`)
-			process.exit()
+			throw e
 		}
 	}
 
@@ -183,7 +209,7 @@ class CiServer {
 
 
 	async saveBuildResultToYandexApi(buildResult) {
-		console.log(buildResult.duration)
+
 		const FinishBuildInput = {
 			buildId: buildResult.id,
 			duration: Number(buildResult.duration),
