@@ -1,6 +1,10 @@
 # Для запуска:
 
-## server 
+```bash
+	npm i && npx lerna bootstrap
+```
+
+## server (в отдельном терминале)
 ```bash
 	cd ./packages/server && npm run start
 ```
@@ -17,7 +21,7 @@
 - Будет принимать от них результат и слать в хранилище.
 - По любому поводу пишет в консоль.
 
-## agent 
+## agent (в отдельном терминале)
 ```bash
 	cd ./packages/agent && npm run start
 ```

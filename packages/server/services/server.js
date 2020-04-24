@@ -34,6 +34,11 @@ class CiServer {
 	}
 
 	async init() {
+		if (!process.env.APITOKEN) {
+			log.error('Can\'t find APITOKEN in .env')
+			process.exit()
+		}
+
 		try {
 			await this.getSettings()
 			await this.getBuilds()
@@ -45,7 +50,6 @@ class CiServer {
 					setTimeout(() => this.init(), 10000)
 					break;
 				case 'HTTP':
-					log.error(e.message)
 					setTimeout(() => this.init(), 10000)
 					break;
 				default:
