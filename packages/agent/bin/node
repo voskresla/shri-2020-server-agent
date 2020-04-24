@@ -40,8 +40,8 @@ const Agent = require('../model/agent')
 Agent.init(
   os.networkInterfaces().lo0[0].address,
   port,
-  process.env.SERVERHOST,
-  process.env.SERVERPORT
+  config.serverhost,
+  config.serverport
 )
 
 
