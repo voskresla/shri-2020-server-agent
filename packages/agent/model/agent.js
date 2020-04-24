@@ -1,5 +1,5 @@
 const log = require('../utils/chalkLogger')
-const { agentStatusEnum, buildStatusEnum } = require("../utils/utils");
+const { agentStatusEnum, buildStatusEnum, parseHrtimeToSeconds } = require("../utils/utils");
 const gitUtils = require('../utils/gitUtils')
 
 
@@ -69,6 +69,8 @@ class Agent {
 	async processBuild(jobBuildModel) {
 		log.success(`Agent: start processing for build: ${jobBuildModel.id}`)
 
+		const startTime = process.hrtime();
+
 		try {
 			this.status = agentStatusEnum.BUSY
 
@@ -76,11 +78,17 @@ class Agent {
 			const result = await gitUtils.getBuildResult(jobBuildModel)
 			log.success(`Agent: build ${jobBuildModel.id} job DONE.`)
 
+			const durationTime = parseHrtimeToSeconds(process.hrtime(startTime));
+			result.duration = durationTime
+
 			this.sendBuildResultToServer(result)
 		} catch (e) {
 			log.error(`Agent: npm processing for build:${jobBuildModel.id} job FAIL.`)
 
 			this.status = agentStatusEnum.FREE
+
+			const durationTime = parseHrtimeToSeconds(process.hrtime(startTime));
+			e.duration = durationTime
 
 			this.sendBuildResultToServer(e) // e = buildResult -> переделать на error flow
 		}

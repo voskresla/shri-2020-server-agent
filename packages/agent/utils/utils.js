@@ -39,3 +39,8 @@ exports.catchErrorAsync = function catchErrorAsync(target, name, descriptor, mes
 		}
 	}
 }
+
+exports.parseHrtimeToSeconds = (hrtime) => {
+	var seconds = (hrtime[0] + (hrtime[1] / 1e9)).toFixed(0);
+	return seconds;
+}

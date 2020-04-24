@@ -1,10 +1,11 @@
 const axios = require('axios')
 const https = require('https');
+const config = require('../config/serverConfig.json')
 
 const log = require('../utils/chalkLogger')
 
 const defaultHTTPClient = axios.create({
-	baseURL: process.env.APIBASEURL,
+	baseURL: config.apibaseurl,
 	headers: {
 		Authorization: `Bearer ${process.env.APITOKEN}`,
 	},
@@ -19,7 +20,7 @@ class YndxApi {
 	}
 
 	getBuilds() {
-		return this.httpClient.get('/build/list/')
+		return this.httpClient.get('/build/list/?limit=300')
 	}
 
 	getConfiguration() {

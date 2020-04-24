@@ -28,16 +28,11 @@ class CiServer {
 	}
 
 	async init() {
+
+		this.getSettings()
 		this.getBuilds()
 		this.processBuildList()
-		const response = await YndxApi.getConfiguration()
-		this.configuration = {
-			id: response.data.data.id,
-			repoName: response.data.data.repoName,
-			buildCommand: response.data.data.buildCommand,
-			mainBranch: response.data.data.mainBranch,
-			period: 20
-		}
+
 	}
 
 	/**
@@ -48,9 +43,26 @@ class CiServer {
 		const agentInfo = { id, host, port }
 
 		if (addAgent(this.agents, agentInfo)) {
-			log.success(`\nRegister new agent: ${host}:${port}\n`)
+			log.success(`Register new agent: ${host}:${port}`)
 		} else {
 			throw { type: 'BL', message: `Agent ${host}:${port} try register twice.` }
+		}
+	}
+
+	async getSettings() {
+		try {
+			const response = await YndxApi.getConfiguration()
+			this.configuration = {
+				id: response.data.data.id,
+				repoName: response.data.data.repoName,
+				buildCommand: response.data.data.buildCommand,
+				mainBranch: response.data.data.mainBranch,
+				period: 20
+			}
+			log.success(`Take configuration.`)
+		} catch (e) {
+			log.error(`YNDX /conf don\`t response, try again later.`)
+			process.exit()
 		}
 	}
 
@@ -63,7 +75,7 @@ class CiServer {
 			() => {
 				YndxApi.getBuilds()
 					.then(({ data: builds }) => {
-						this.builds = builds.data
+						this.builds = builds.data.filter(e => e.status === 'Waiting').reverse()
 					})
 					.catch(e => log.error('YndxApi: getBuilds() -> 500'))
 			},
@@ -171,9 +183,10 @@ class CiServer {
 
 
 	async saveBuildResultToYandexApi(buildResult) {
+		console.log(buildResult.duration)
 		const FinishBuildInput = {
 			buildId: buildResult.id,
-			duration: 1000,
+			duration: Number(buildResult.duration),
 			success: buildResult.status,
 			buildLog: '' + buildResult.stdout + buildResult.stderr
 		}

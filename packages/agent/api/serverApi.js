@@ -1,5 +1,7 @@
 const axios = require('axios')
 const log = require('../utils/chalkLogger')
+const config = require('../config/agentConfig.json')
+
 
 const serverRoutes = {
 	notifyAgent: '/notify-agent',
@@ -7,7 +9,7 @@ const serverRoutes = {
 }
 
 const defaultHTTPClient = axios.create({
-	baseURL: `${process.env.SERVERHOST}:${process.env.SERVERPORT}`,
+	baseURL: `${config.serverhost}:${config.serverport}`,
 });
 
 class ServerApi {
